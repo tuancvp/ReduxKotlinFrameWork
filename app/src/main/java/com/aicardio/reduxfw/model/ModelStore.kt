@@ -3,7 +3,7 @@ package com.aicardio.reduxfw.model
 import com.aicardio.reduxfw.iface.IAction
 
 class ModelStore {
-    val actionToModel = HashMap<IAction, ArrayList<Model> >()
+    val actionToModel = HashMap<String, ArrayList<Model> >()
 
     fun store(model: Model) {
         model.actionStore.actionToReducer.forEach {
@@ -15,7 +15,8 @@ class ModelStore {
     }
 
     fun getModelsByAction(a: IAction): ArrayList<Model> {
-        return actionToModel.get(a)?.let { it } ?: ArrayList()
+        val key = a.javaClass.name
+        return actionToModel.get(key)?.let { it } ?: ArrayList()
     }
 
 }

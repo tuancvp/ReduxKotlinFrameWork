@@ -1,23 +1,47 @@
 package com.aicardio.reduxfw
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.aicardio.reduxfw.iface.IAction
 import com.aicardio.reduxfw.iface.IReducer
 import com.aicardio.reduxfw.iface.ISubscriber
 import com.aicardio.reduxfw.model.Model
+import com.aicardio.reduxfw.view.ItemChosenListener
+import com.aicardio.reduxfw.view.ListItemView
 import kotlinx.android.synthetic.main.activity_main.*
 import org.json.JSONObject
-import kotlin.reflect.typeOf
+import java.util.logging.Logger
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), ItemChosenListener {
 
     val model = Model()
     val subModel = Model()
+    private var permissionGranted = false
+
+    companion object {
+        private const val MY_PERMISSIONS_REQUEST_CODE = 1
+        const val OUTER_TEXT = "value"
+        const val SUB_TEXT = "value"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContentView(R.layout.activity_main)
+
+        checkAndRequestPermissions(
+            this,
+            arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.INTERNET
+            )
+        )
 
         val clickAction = ClickAction()
         val clickReducer = ClickReducer()
@@ -46,10 +70,56 @@ class MainActivity : AppCompatActivity() {
 
 
         model.add_model("subtext", subModel)
+        model.add_model("file_paths", rv_folder_list.model)
         model.perform_action(initAction)
+
+        val context = this
+        rv_folder_list.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = rv_folder_list.getMyAdapter()
+            setHasFixedSize(true)
+        }
+
+        rv_folder_list.model.perform_action(ListItemView.InitAction("/storage/emulated/0/Download"))
+        rv_folder_list.itemChosenListener = this
+
     }
 
-    class SubClickAction : IAction {
+    override fun onItemChosen(file_path: String) {
+        subModel.perform_action(SubClickAction(file_path))
+    }
+
+    private fun checkAndRequestPermissions(
+        thisActivity: AppCompatActivity,
+        permissions: Array<String>
+    ) {
+        // Here, thisActivity is the current activity
+        var granted = true
+        permissions.forEach { permission ->
+            if (ContextCompat.checkSelfPermission(
+                    thisActivity,
+                    permission
+                ) != PackageManager.PERMISSION_GRANTED
+            )
+                granted = false
+        }
+
+        permissionGranted = if (!granted) {
+            // Permission is not granted
+            // Should we show an explanation?
+            ActivityCompat.requestPermissions(
+                thisActivity,
+                permissions,
+                MY_PERMISSIONS_REQUEST_CODE
+            )
+            false
+        } else {
+            true
+        }
+        Logger.getLogger("MainActivity").warning("Permission granted = $permissionGranted")
+    }
+
+    class SubClickAction(val filePath: String = "no value") : IAction {
 
     }
 
@@ -63,27 +133,36 @@ class MainActivity : AppCompatActivity() {
 //    }
 
     class SubClickReducer : IReducer {
-        override fun dispatch(component_data: JSONObject, action: IAction): ArrayList<String> {
+        override fun dispatch(model: Model, action: IAction): ArrayList<String> {
+            model.startChange()
+
             if (action is SubClickAction) {
-                if (component_data.has("value")) {
-                    val value = component_data.getString("value")
-                    component_data.put("value", if (value != "done") "done" else "not done")
+
+//                val component_data = model.data
+                if (action.filePath == "no value") {
+                    if (model.hasValue(SUB_TEXT)) {
+                        val value: String? = model.getValueByKey(SUB_TEXT)
+                        model.changeKey(SUB_TEXT, if (value != "done") "done" else "not done")
+                    } else {
+                        model.changeKey(SUB_TEXT, "init value")
+                    }
                 } else {
-                    component_data.put("value","init value")
+                    model.changeKey(SUB_TEXT, action.filePath)
                 }
-                return arrayListOf("value")
+
             }
-            return ArrayList()
+            return model.stopChange()
         }
     }
 
     class InitValueReducer : IReducer {
-        override fun dispatch(data: JSONObject, action: IAction): ArrayList<String> {
+        override fun dispatch(model: Model, action: IAction): ArrayList<String> {
+            model.startChange()
+
             if (action is InitValueAction) {
-                data.put("value", "Initialized")
-                return arrayListOf("value")
+                model.changeKey(OUTER_TEXT, "Initialized")
             }
-            return ArrayList()
+            return model.stopChange()
         }
     }
 
@@ -97,12 +176,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     class ClickReducer : IReducer {
-        override fun dispatch(data: JSONObject, action: IAction): ArrayList<String> {
+        override fun dispatch(model: Model, action: IAction): ArrayList<String> {
+            model.startChange()
             if (action is ClickAction) {
-                data.put("value", "Done")
-                return arrayListOf("value")
+                model.changeKey(OUTER_TEXT, "Done")
             }
-            return ArrayList()
+            return model.stopChange()
         }
 
     }

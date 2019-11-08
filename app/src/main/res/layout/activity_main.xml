@@ -33,4 +33,10 @@
         tools:layout_editor_absoluteX="176dp"
         tools:layout_editor_absoluteY="597dp" />
 
+    <com.aicardio.reduxfw.view.ListItemView
+        android:id="@+id/rv_folder_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        />
+
 </LinearLayout>
